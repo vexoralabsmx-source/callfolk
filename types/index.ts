@@ -8,6 +8,7 @@ export type Person = {
 };
 
 export type Conversation = Person & {
+  personId: string;
   preview: string;
   time: string;
   unread?: number;
@@ -15,6 +16,7 @@ export type Conversation = Person & {
 };
 
 export type CallRecord = Person & {
+  recordId: string;
   direction: 'incoming' | 'outgoing' | 'missed';
   time: string;
   duration?: string;

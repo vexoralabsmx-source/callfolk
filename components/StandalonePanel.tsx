@@ -5,7 +5,7 @@ import { AmbientBackground } from '@/components/AmbientBackground';
 
 export function StandalonePanel({ children, edges = ['top', 'bottom'], wide = false }: PropsWithChildren<{ edges?: Edge[]; wide?: boolean }>) {
   const { width } = useWindowDimensions();
-  const desktop = Platform.OS === 'web' && width >= 768;
+  const desktop = Platform.OS === 'web' && width >= 1024;
   return (
     <View className="flex-1 bg-ink">
       <AmbientBackground />
@@ -14,7 +14,7 @@ export function StandalonePanel({ children, edges = ['top', 'bottom'], wide = fa
         edges={edges}
         style={desktop ? {
           width: '100%',
-          maxWidth: wide ? 720 : 560,
+          maxWidth: wide ? 1120 : 900,
           alignSelf: 'center',
           borderLeftWidth: 1,
           borderRightWidth: 1,

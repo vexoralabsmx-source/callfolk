@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Platform, StyleSheet } from 'react-native';
 import { colors } from '@/lib/theme';
+import { supabase } from '@/lib/supabase';
 import { registerDeviceForPush } from '@/lib/notifications';
 import { useAuthStore } from '@/stores/auth-store';
 
@@ -24,6 +25,8 @@ export default function RootLayout() {
 
   useEffect(() => {
     hydrate();
+    const { data } = supabase.auth.onAuthStateChange(() => { hydrate(); });
+    return () => data.subscription.unsubscribe();
   }, [hydrate]);
 
   useEffect(() => {

@@ -15,13 +15,11 @@ export function useLiveKitCall(calleeId: string) {
 
   useEffect(() => {
     let cancelled = false;
-    let demoTimer: ReturnType<typeof setTimeout> | undefined;
-
     async function connect() {
       setStatus('connecting');
       const { data } = await supabase.auth.getSession();
       if (!isSupabaseConfigured || !data.session) {
-        demoTimer = setTimeout(() => !cancelled && setStatus('connected'), 1300);
+        setStatus('failed');
         return;
       }
 
@@ -45,7 +43,6 @@ export function useLiveKitCall(calleeId: string) {
     connect();
     return () => {
       cancelled = true;
-      if (demoTimer) clearTimeout(demoTimer);
       roomRef.current?.disconnect();
       roomRef.current = null;
       AudioSession.stopAudioSession();

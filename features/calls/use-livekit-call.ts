@@ -6,9 +6,7 @@ export function useLiveKitCall(_calleeId: string) {
   const reset = useCallStore((state) => state.reset);
 
   useEffect(() => {
-    setStatus('connecting');
-    const timer = setTimeout(() => setStatus('connected'), 1300);
-    return () => clearTimeout(timer);
+    setStatus('failed');
   }, [setStatus]);
 
   return { end: async () => reset(), isLive: false };

@@ -10,7 +10,7 @@ cp .env.example .env
 npm start
 ```
 
-Without environment variables, authentication runs in demo mode so the complete UI flow remains testable. Apply `supabase/migrations/001_initial.sql` to a new Supabase project before enabling real auth.
+Authentication requires a configured Supabase project. Apply `supabase/migrations/001_initial.sql` to a new project before enabling registration.
 
 Existing Supabase projects created with the first schema version must also apply `supabase/migrations/002_fix_profile_signup.sql`. It repairs the profile trigger that can otherwise return `Database error saving new user` during registration.
 

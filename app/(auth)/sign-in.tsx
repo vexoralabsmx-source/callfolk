@@ -14,7 +14,7 @@ const schema = z.object({ email: z.string().email('Enter a valid email'), passwo
 type Values = z.infer<typeof schema>;
 
 export default function SignInScreen() {
-  const signInDemo = useAuthStore((state) => state.signInDemo);
+  const hydrate = useAuthStore((state) => state.hydrate);
   const [serverError, setServerError] = useState<string | null>(null);
   const { control, handleSubmit, formState: { errors, isSubmitting } } = useForm<Values>({
     resolver: zodResolver(schema), defaultValues: { email: '', password: '' },
@@ -24,16 +24,13 @@ export default function SignInScreen() {
     if (isSupabaseConfigured) {
       const { error } = await supabase.auth.signInWithPassword(values);
       if (error) { setServerError(error.message); return; }
+    } else {
+      setServerError('Authentication is not configured. Add the Supabase environment variables before signing in.');
+      return;
     }
-    await signInDemo();
+    await hydrate();
     router.replace('/(tabs)/chats');
   });
-
-  const continueLocally = async () => {
-    setServerError(null);
-    await signInDemo();
-    router.replace('/(tabs)/chats');
-  };
 
   return (
     <AuthShell title="Welcome back" subtitle="Sign in with your email. No phone number, ever.">
@@ -46,18 +43,12 @@ export default function SignInScreen() {
       {serverError ? (
         <View className="mt-3 rounded-2xl border border-danger/25 bg-danger/10 p-4">
           <Text className="text-sm leading-5 text-danger">{serverError}</Text>
-          {__DEV__ ? (
-            <Pressable accessibilityRole="button" onPress={continueLocally} className="mt-3 h-12 items-center justify-center rounded-xl bg-white/[0.08] active:opacity-70">
-              <Text className="font-semibold text-primary">Continue in demo mode</Text>
-            </Pressable>
-          ) : null}
         </View>
       ) : null}
       <Pressable accessibilityRole="button" onPress={() => undefined} className="self-end p-2"><Text className="font-medium text-accent">Forgot password?</Text></Pressable>
       <Pressable disabled={isSubmitting} onPress={onSubmit} className="mt-5 h-16 items-center justify-center rounded-[20px] bg-accent active:opacity-80 disabled:opacity-50">
         {isSubmitting ? <ActivityIndicator color={colors.text} /> : <Text className="text-[17px] font-semibold text-white">Sign in</Text>}
       </Pressable>
-      {!isSupabaseConfigured ? <Text className="mt-4 text-center text-xs text-subtle">Demo mode · any valid email and password will work</Text> : null}
     </AuthShell>
   );
 }

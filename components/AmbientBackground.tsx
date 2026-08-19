@@ -3,7 +3,7 @@ import { View } from 'react-native';
 
 export function AmbientBackground() {
   return (
-    <View pointerEvents="none" className="absolute inset-0 overflow-hidden bg-ink">
+    <View className="absolute inset-0 overflow-hidden bg-ink" style={{ pointerEvents: 'none' }}>
       <LinearGradient
         colors={['rgba(117,108,255,0.30)', 'rgba(117,108,255,0.03)', 'transparent']}
         className="absolute -right-32 -top-32 h-[520px] w-[520px] rounded-full"

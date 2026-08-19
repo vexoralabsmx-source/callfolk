@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { sessionStorage } from '@/lib/session-storage';
+import type { User } from '@supabase/supabase-js';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
 export type AppUser = {
   id: string;
@@ -11,34 +12,39 @@ export type AppUser = {
 type AuthState = {
   user: AppUser | null;
   hydrated: boolean;
-  signInDemo: (user?: Partial<AppUser>) => Promise<void>;
   signOut: () => Promise<void>;
   hydrate: () => Promise<void>;
 };
 
-const demoUser: AppUser = {
-  id: '0c05e14f-c3fb-41d1-ae59-07859b53eb94',
-  displayName: 'Mike Evans',
-  username: 'mike',
-  contactId: 'MKE-7K82-A91',
-};
+async function resolveUser(authUser: User): Promise<AppUser> {
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, display_name, username, contact_id')
+    .eq('id', authUser.id)
+    .maybeSingle();
 
-const STORAGE_KEY = 'callfolk.session';
+  return {
+    id: authUser.id,
+    displayName: data?.display_name ?? authUser.user_metadata?.display_name ?? authUser.email?.split('@')[0] ?? 'Callfolk user',
+    username: data?.username ?? authUser.user_metadata?.username ?? '',
+    contactId: data?.contact_id ?? '',
+  };
+}
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   hydrated: false,
-  async signInDemo(input) {
-    const user = { ...demoUser, ...input };
-    await sessionStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-    set({ user });
-  },
   async signOut() {
-    await sessionStorage.removeItem(STORAGE_KEY);
-    set({ user: null });
+    if (isSupabaseConfigured) await supabase.auth.signOut();
+    set({ user: null, hydrated: true });
   },
   async hydrate() {
-    const raw = await sessionStorage.getItem(STORAGE_KEY);
-    set({ user: raw ? (JSON.parse(raw) as AppUser) : null, hydrated: true });
+    if (!isSupabaseConfigured) {
+      set({ user: null, hydrated: true });
+      return;
+    }
+    const { data } = await supabase.auth.getSession();
+    const user = data.session?.user ? await resolveUser(data.session.user) : null;
+    set({ user, hydrated: true });
   },
 }));

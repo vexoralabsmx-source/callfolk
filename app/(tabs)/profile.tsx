@@ -1,4 +1,4 @@
-import { ScrollView, Pressable, Text, View } from 'react-native';
+import { Platform, ScrollView, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
 import QRCode from 'react-native-qrcode-svg';
 import { Bell, ChevronRight, CircleUserRound, EyeOff, LogOut, Palette, Shield, Share2 } from 'lucide-react-native';
@@ -6,6 +6,7 @@ import { Avatar } from '@/components/Avatar';
 import { Screen } from '@/components/Screen';
 import { colors } from '@/lib/theme';
 import { useAuthStore } from '@/stores/auth-store';
+import { initialsFor } from '@/lib/presentation';
 
 const settings = [
   { icon: Shield, label: 'Privacy' },
@@ -18,27 +19,29 @@ const settings = [
 export default function ProfileScreen() {
   const user = useAuthStore((state) => state.user);
   const signOut = useAuthStore((state) => state.signOut);
-  const name = user?.displayName ?? 'Mike Evans';
-  const username = user?.username ?? 'mike';
-  const contactId = user?.contactId ?? 'MKE-7K82-A91';
-  const initials = name.split(' ').map((part) => part[0]).join('').slice(0, 2);
+  const name = user?.displayName ?? 'Callfolk user';
+  const username = user?.username ?? '';
+  const contactId = user?.contactId ?? '';
+  const initials = initialsFor(name);
+  const { width } = useWindowDimensions();
+  const desktop = Platform.OS === 'web' && width >= 1024;
 
   const handleSignOut = async () => { await signOut(); router.replace('/'); };
 
   return (
     <Screen>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120, width: '100%', maxWidth: desktop ? 760 : undefined, alignSelf: 'center', paddingHorizontal: desktop ? 40 : 0 }}>
         <Text className="mb-8 mt-5 text-[34px] font-semibold tracking-[-1px] text-primary">Profile</Text>
         <View className="items-center rounded-[28px] border border-white/[0.07] bg-surface px-5 py-7">
           <Avatar initials={initials} size={84} />
           <Text className="mt-4 text-[24px] font-semibold text-primary">{name}</Text>
-          <Text className="mt-1 text-[15px] text-secondary">@{username}</Text>
-          <View className="mt-5 rounded-[22px] bg-white p-3">
+          {username ? <Text className="mt-1 text-[15px] text-secondary">@{username}</Text> : null}
+          {contactId ? <View className="mt-5 rounded-[22px] bg-white p-3">
             <QRCode value={`callfolk://contact/${contactId}`} size={132} color={colors.ink} backgroundColor="#FFFFFF" />
-          </View>
-          <View className="mt-4 rounded-full border border-white/[0.08] bg-elevated px-4 py-2">
+          </View> : null}
+          {contactId ? <View className="mt-4 rounded-full border border-white/[0.08] bg-elevated px-4 py-2">
             <Text selectable className="text-[13px] font-semibold tracking-[1.5px] text-primary">{contactId}</Text>
-          </View>
+          </View> : null}
           <View className="mt-6 w-full flex-row gap-3">
             <Pressable className="h-12 flex-1 flex-row items-center justify-center rounded-2xl bg-elevated active:opacity-60"><Share2 size={18} color={colors.text} /><Text className="ml-2 font-semibold text-primary">Share</Text></Pressable>
             <Pressable className="h-12 flex-1 items-center justify-center rounded-2xl bg-primary active:opacity-80"><Text className="font-semibold text-ink">Edit profile</Text></Pressable>
