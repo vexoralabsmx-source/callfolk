@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router } from 'expo-router';
 import { AtSign, ContactRound, QrCode, ScanLine, Search, UserPlus, X } from 'lucide-react-native';
 import { Avatar } from '@/components/Avatar';
 import { StandalonePanel } from '@/components/StandalonePanel';
 import { personFromProfile } from '@/lib/presentation';
+import { sendContactRequest, withTimeout } from '@/features/app-data';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
 import { useAuthStore } from '@/stores/auth-store';
@@ -20,6 +21,7 @@ export default function AddContactScreen() {
   const [result, setResult] = useState<Person | null>(null);
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
 
   useEffect(() => {
@@ -31,36 +33,49 @@ export default function AddContactScreen() {
     const timer = setTimeout(async () => {
       setLoading(true);
       setFeedback(null);
+      setSent(false);
       const normalized = query.replace(/^@/, '').trim().replace(/[^a-zA-Z0-9_-]/g, '');
       let request = supabase.from('profiles').select('id, display_name, username, last_seen_at').neq('id', user?.id ?? '').limit(1);
       request = mode === 'username' ? request.ilike('username', `%${normalized.toLowerCase()}%`) : request.ilike('contact_id', `%${normalized.toUpperCase()}%`);
-      const { data, error } = await request.maybeSingle();
-      setLoading(false);
-      if (error) {
-        setFeedback('Could not search right now. Check your connection.');
-        return;
+      try {
+        const { data, error } = await withTimeout(request.maybeSingle());
+        if (error) {
+          setFeedback('Could not search right now. Check your connection.');
+          return;
+        }
+        setResult(data ? personFromProfile(data) : null);
+        if (!data) setFeedback('No Callfolk account matches that search.');
+      } catch (error) {
+        setResult(null);
+        setFeedback(error instanceof Error ? error.message : 'Could not search right now.');
+      } finally {
+        setLoading(false);
       }
-      setResult(data ? personFromProfile(data) : null);
-      if (!data) setFeedback('No Callfolk account matches that search.');
     }, 400);
     return () => clearTimeout(timer);
   }, [mode, query, user?.id]);
 
   const setQrMode = async () => {
+    if (Platform.OS === 'web') {
+      setFeedback('QR scanning is available in the mobile app.');
+      return;
+    }
     setMode('qr');
     if (!permission?.granted) await requestPermission();
   };
 
-  const addContact = async () => {
+  const sendRequest = async () => {
     if (!user || !result) return;
     setLoading(true);
-    const { error } = await supabase.from('contacts').upsert({ owner_id: user.id, contact_id: result.id }, { onConflict: 'owner_id,contact_id' });
-    setLoading(false);
-    if (error) {
-      setFeedback(error.message);
-      return;
+    setFeedback(null);
+    try {
+      await sendContactRequest(result.id);
+      setSent(true);
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Could not send the request.');
+    } finally {
+      setLoading(false);
     }
-    router.replace('/(tabs)/contacts');
   };
 
   return (
@@ -98,7 +113,9 @@ export default function AddContactScreen() {
                 <Avatar initials={result.initials} color={result.color} online={result.online} size={76} />
                 <Text className="mt-4 text-[22px] font-semibold text-primary">{result.name}</Text>
                 <Text className="mt-1 text-sm text-secondary">@{result.username}</Text>
-                <Pressable disabled={loading} onPress={addContact} className="mt-6 h-14 w-full flex-row items-center justify-center rounded-[18px] bg-accent active:opacity-80 disabled:opacity-50"><UserPlus size={19} color={colors.text} /><Text className="ml-2 font-semibold text-white">Add contact</Text></Pressable>
+                {feedback ? <Text className="mt-4 text-center text-[13px] leading-5 text-danger">{feedback}</Text> : null}
+                <Pressable disabled={loading || sent} onPress={sendRequest} className={`mt-6 h-14 w-full flex-row items-center justify-center rounded-[18px] active:opacity-80 disabled:opacity-60 ${sent ? 'bg-success/15' : 'bg-accent'}`}>{loading ? <ActivityIndicator color={colors.text} /> : <><UserPlus size={19} color={sent ? colors.success : colors.text} /><Text className={`ml-2 font-semibold ${sent ? 'text-success' : 'text-white'}`}>{sent ? 'Request sent' : 'Send friend request'}</Text></>}</Pressable>
+                {sent ? <Pressable onPress={() => router.replace({ pathname: '/(tabs)/contacts', params: { tab: 'requests' } })} className="mt-2 h-12 items-center justify-center rounded-[16px] active:bg-white/[0.05]"><Text className="font-semibold text-secondary">View requests</Text></Pressable> : null}
               </View>
             ) : (
               <View className="flex-1 items-center justify-center pb-24"><View className="h-16 w-16 items-center justify-center rounded-3xl bg-elevated"><Search size={28} color={colors.accent} /></View><Text className="mt-5 text-xl font-semibold text-primary">Find a contact</Text><Text className="mt-2 max-w-[300px] text-center leading-6 text-secondary">Enter at least three characters from a username or contact ID.</Text>{feedback ? <Text className="mt-4 text-center text-sm text-danger">{feedback}</Text> : null}</View>

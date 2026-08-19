@@ -25,8 +25,15 @@ export default function RootLayout() {
 
   useEffect(() => {
     hydrate();
-    const { data } = supabase.auth.onAuthStateChange(() => { hydrate(); });
-    return () => data.subscription.unsubscribe();
+    let pendingHydration: ReturnType<typeof setTimeout> | undefined;
+    const { data } = supabase.auth.onAuthStateChange(() => {
+      if (pendingHydration) clearTimeout(pendingHydration);
+      pendingHydration = setTimeout(() => { void hydrate(); }, 0);
+    });
+    return () => {
+      if (pendingHydration) clearTimeout(pendingHydration);
+      data.subscription.unsubscribe();
+    };
   }, [hydrate]);
 
   useEffect(() => {

@@ -5,24 +5,49 @@ import type { CallRecord, Conversation, Person } from '@/types';
 
 type ProfileRow = { id: string; display_name: string; username: string; last_seen_at: string | null };
 
+export type ContactRequestView = {
+  id: string;
+  person: Person;
+  direction: 'incoming' | 'outgoing';
+  createdAt: string;
+};
+
+export function withTimeout<T>(operation: PromiseLike<T>, timeoutMs = 12_000) {
+  return Promise.race([
+    Promise.resolve(operation),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('The request took too long. Check your connection and try again.')), timeoutMs)),
+  ]);
+}
+
+export async function sendContactRequest(targetUserId: string) {
+  const { data, error } = await withTimeout(supabase.rpc('send_contact_request', { target_user: targetUserId }));
+  if (error) throw error;
+  return data as string;
+}
+
+export async function respondToContactRequest(requestId: string, accept: boolean) {
+  const { error } = await withTimeout(supabase.rpc('respond_to_contact_request', { request_id: requestId, accept_request: accept }));
+  if (error) throw error;
+}
+
 export async function startConversation(userId: string, personId: string) {
   const conversationId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
     const random = Math.floor(Math.random() * 16);
     return (character === 'x' ? random : (random & 0x3) | 0x8).toString(16);
   });
-  const { error } = await supabase.from('conversations').insert({ id: conversationId, created_by: userId });
+  const { error } = await withTimeout(supabase.from('conversations').insert({ id: conversationId, created_by: userId }));
   if (error) throw error;
-  const { error: membersError } = await supabase.from('conversation_members').insert([
+  const { error: membersError } = await withTimeout(supabase.from('conversation_members').insert([
     { conversation_id: conversationId, user_id: userId },
     { conversation_id: conversationId, user_id: personId },
-  ]);
+  ]));
   if (membersError) throw membersError;
   return conversationId;
 }
 
 async function profilesByIds(ids: string[]) {
   if (!ids.length) return new Map<string, Person>();
-  const { data, error } = await supabase.from('profiles').select('id, display_name, username, last_seen_at').in('id', ids);
+  const { data, error } = await withTimeout(supabase.from('profiles').select('id, display_name, username, last_seen_at').in('id', ids));
   if (error) throw error;
   return new Map((data as ProfileRow[]).map((profile) => [profile.id, personFromProfile(profile)]));
 }
@@ -64,6 +89,29 @@ export function useContacts(userId?: string) {
       if (error) throw error;
       const map = await profilesByIds((data ?? []).map((row) => row.contact_id));
       return [...map.values()];
+    },
+  });
+}
+
+export function useContactRequests(userId?: string) {
+  return useQuery({
+    queryKey: ['contact-requests', userId],
+    enabled: Boolean(userId),
+    refetchInterval: 10_000,
+    queryFn: async (): Promise<ContactRequestView[]> => {
+      const { data, error } = await withTimeout(supabase
+        .from('contact_requests')
+        .select('id, sender_id, receiver_id, created_at')
+        .eq('status', 'pending')
+        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+        .order('created_at', { ascending: false }));
+      if (error) throw error;
+      const profileMap = await profilesByIds((data ?? []).map((request) => request.sender_id === userId ? request.receiver_id : request.sender_id));
+      return (data ?? []).flatMap((request) => {
+        const incoming = request.receiver_id === userId;
+        const person = profileMap.get(incoming ? request.sender_id : request.receiver_id);
+        return person ? [{ id: request.id, person, direction: incoming ? 'incoming' : 'outgoing', createdAt: request.created_at }] : [];
+      });
     },
   });
 }

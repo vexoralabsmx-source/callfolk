@@ -14,6 +14,8 @@ Authentication requires a configured Supabase project. Apply `supabase/migration
 
 Existing Supabase projects created with the first schema version must also apply `supabase/migrations/002_fix_profile_signup.sql`. It repairs the profile trigger that can otherwise return `Database error saving new user` during registration.
 
+Apply `supabase/migrations/003_contact_request_workflow.sql` to enable friend requests. It adds the protected database functions used to send, accept, and decline requests, and creates mutual contacts only after a request is accepted.
+
 LiveKit access tokens must be minted by a trusted server or Supabase Edge Function. Never place API secrets in `EXPO_PUBLIC_*` variables.
 
 ## Enable real calls

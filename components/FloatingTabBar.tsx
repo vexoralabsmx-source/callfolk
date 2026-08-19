@@ -4,6 +4,7 @@ import { Platform, Pressable, Text, useWindowDimensions, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/Avatar';
 import { BrandMark } from '@/components/BrandMark';
+import { useContactRequests } from '@/features/app-data';
 import { colors } from '@/lib/theme';
 import { initialsFor } from '@/lib/presentation';
 import { useAuthStore } from '@/stores/auth-store';
@@ -21,6 +22,8 @@ export function FloatingTabBar({ state, descriptors, navigation }: FloatingTabBa
   const { width } = useWindowDimensions();
   const desktop = Platform.OS === 'web' && width >= 1024;
   const user = useAuthStore((store) => store.user);
+  const requests = useContactRequests(user?.id);
+  const requestCount = (requests.data ?? []).filter((request) => request.direction === 'incoming').length;
   if (desktop) {
     return (
       <View className="absolute bottom-0 left-0 top-0 w-[248px] border-r border-white/[0.07] bg-canvas px-4 pb-5 pt-6">
@@ -42,7 +45,7 @@ export function FloatingTabBar({ state, descriptors, navigation }: FloatingTabBa
               >
                 <Icon size={20} color={focused ? colors.accentSoft : colors.muted} strokeWidth={focused ? 2.3 : 2} />
                 <Text className={`ml-3 text-[14px] font-semibold ${focused ? 'text-primary' : 'text-secondary'}`}>{label}</Text>
-                {focused ? <View className="ml-auto h-1.5 w-1.5 rounded-full bg-accent" /> : null}
+                {route.name === 'contacts' && requestCount ? <View className="ml-auto min-w-[20px] items-center rounded-full bg-accent px-1.5 py-0.5"><Text className="text-[10px] font-bold text-white">{requestCount}</Text></View> : focused ? <View className="ml-auto h-1.5 w-1.5 rounded-full bg-accent" /> : null}
               </Pressable>
             );
           })}
@@ -81,6 +84,7 @@ export function FloatingTabBar({ state, descriptors, navigation }: FloatingTabBa
               >
                 <Icon size={21} color={focused ? colors.text : colors.subtle} strokeWidth={focused ? 2.4 : 2} />
                 <Text className={`mt-1 text-[11px] font-medium ${focused ? 'text-primary' : 'text-subtle'}`}>{label}</Text>
+                {route.name === 'contacts' && requestCount ? <View className="absolute right-4 top-1 min-w-[18px] items-center rounded-full bg-accent px-1 py-0.5"><Text className="text-[9px] font-bold text-white">{requestCount}</Text></View> : null}
                 {focused ? <View className="absolute bottom-0 h-[3px] w-6 rounded-full bg-accent" /> : null}
               </Pressable>
             );
