@@ -1,4 +1,4 @@
-import { Platform, ScrollView, Pressable, Text, useWindowDimensions, View } from 'react-native';
+import { Platform, ScrollView, Pressable, Share, Text, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
 import QRCode from 'react-native-qrcode-svg';
 import { Bell, ChevronRight, CircleUserRound, EyeOff, LogOut, Palette, Shield, Share2 } from 'lucide-react-native';
@@ -9,11 +9,11 @@ import { useAuthStore } from '@/stores/auth-store';
 import { initialsFor } from '@/lib/presentation';
 
 const settings = [
-  { icon: Shield, label: 'Privacy' },
-  { icon: Bell, label: 'Notifications' },
-  { icon: EyeOff, label: 'Blocked users' },
-  { icon: Palette, label: 'Appearance' },
-  { icon: CircleUserRound, label: 'Account' },
+  { icon: Shield, label: 'Privacy', section: 'privacy' },
+  { icon: Bell, label: 'Notifications', section: 'notifications' },
+  { icon: EyeOff, label: 'Blocked users', section: 'blocked' },
+  { icon: Palette, label: 'Appearance', section: 'appearance' },
+  { icon: CircleUserRound, label: 'Account', section: 'account' },
 ];
 
 export default function ProfileScreen() {
@@ -27,6 +27,10 @@ export default function ProfileScreen() {
   const desktop = Platform.OS === 'web' && width >= 1024;
 
   const handleSignOut = async () => { await signOut(); router.replace('/'); };
+  const shareProfile = async () => {
+    const message = `Add me on Callfolk${username ? ` as @${username}` : ''}${contactId ? `. Contact ID: ${contactId}` : ''}`;
+    await Share.share({ title: 'My Callfolk profile', message });
+  };
 
   return (
     <Screen>
@@ -43,13 +47,13 @@ export default function ProfileScreen() {
             <Text selectable className="text-[13px] font-semibold tracking-[1.5px] text-primary">{contactId}</Text>
           </View> : null}
           <View className="mt-6 w-full flex-row gap-3">
-            <Pressable className="h-12 flex-1 flex-row items-center justify-center rounded-2xl bg-elevated active:opacity-60"><Share2 size={18} color={colors.text} /><Text className="ml-2 font-semibold text-primary">Share</Text></Pressable>
-            <Pressable className="h-12 flex-1 items-center justify-center rounded-2xl bg-primary active:opacity-80"><Text className="font-semibold text-ink">Edit profile</Text></Pressable>
+            <Pressable accessibilityRole="button" onPress={shareProfile} className="h-12 flex-1 flex-row items-center justify-center rounded-2xl bg-elevated active:opacity-60"><Share2 size={18} color={colors.text} /><Text className="ml-2 font-semibold text-primary">Share</Text></Pressable>
+            <Pressable accessibilityRole="button" onPress={() => router.push('/profile/edit')} className="h-12 flex-1 items-center justify-center rounded-2xl bg-primary active:opacity-80"><Text className="font-semibold text-ink">Edit profile</Text></Pressable>
           </View>
         </View>
         <View className="mt-6 overflow-hidden rounded-[24px] border border-white/[0.06] bg-surface px-2">
-          {settings.map(({ icon: Icon, label }, index) => (
-            <Pressable key={label} className={`h-15 min-h-[60px] flex-row items-center px-3 active:bg-white/[0.04] ${index < settings.length - 1 ? 'border-b border-white/[0.05]' : ''}`}>
+          {settings.map(({ icon: Icon, label, section }, index) => (
+            <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={() => router.push({ pathname: '/settings/[section]', params: { section } })} key={label} className={`h-15 min-h-[60px] flex-row items-center px-3 active:bg-white/[0.04] ${index < settings.length - 1 ? 'border-b border-white/[0.05]' : ''}`}>
               <View className="h-9 w-9 items-center justify-center rounded-xl bg-elevated"><Icon size={18} color={colors.muted} /></View>
               <Text className="ml-3 flex-1 text-[15px] font-medium text-primary">{label}</Text>
               <ChevronRight size={18} color={colors.subtle} />

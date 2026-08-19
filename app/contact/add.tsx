@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router } from 'expo-router';
-import { AtSign, ContactRound, QrCode, ScanLine, Search, UserPlus, X } from 'lucide-react-native';
+import { AtSign, Check, Clock3, ContactRound, QrCode, ScanLine, Search, UserPlus, X } from 'lucide-react-native';
 import { Avatar } from '@/components/Avatar';
 import { StandalonePanel } from '@/components/StandalonePanel';
 import { personFromProfile } from '@/lib/presentation';
-import { sendContactRequest, withTimeout } from '@/features/app-data';
+import { readableError, sendContactRequest, useContactRequests, useContacts, withTimeout } from '@/features/app-data';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
 import { useAuthStore } from '@/stores/auth-store';
@@ -23,6 +23,10 @@ export default function AddContactScreen() {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
+  const contacts = useContacts(user?.id);
+  const requests = useContactRequests(user?.id);
+  const alreadyContact = Boolean(result && contacts.data?.some((person) => person.id === result.id));
+  const requestPending = Boolean(result && requests.data?.some((request) => request.person.id === result.id));
 
   useEffect(() => {
     if (mode === 'qr' || query.trim().length < 3) {
@@ -72,7 +76,7 @@ export default function AddContactScreen() {
       await sendContactRequest(result.id);
       setSent(true);
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Could not send the request.');
+      setFeedback(readableError(error, 'Could not send the request.'));
     } finally {
       setLoading(false);
     }
@@ -114,7 +118,7 @@ export default function AddContactScreen() {
                 <Text className="mt-4 text-[22px] font-semibold text-primary">{result.name}</Text>
                 <Text className="mt-1 text-sm text-secondary">@{result.username}</Text>
                 {feedback ? <Text className="mt-4 text-center text-[13px] leading-5 text-danger">{feedback}</Text> : null}
-                <Pressable disabled={loading || sent} onPress={sendRequest} className={`mt-6 h-14 w-full flex-row items-center justify-center rounded-[18px] active:opacity-80 disabled:opacity-60 ${sent ? 'bg-success/15' : 'bg-accent'}`}>{loading ? <ActivityIndicator color={colors.text} /> : <><UserPlus size={19} color={sent ? colors.success : colors.text} /><Text className={`ml-2 font-semibold ${sent ? 'text-success' : 'text-white'}`}>{sent ? 'Request sent' : 'Send friend request'}</Text></>}</Pressable>
+                <Pressable disabled={loading || sent || requestPending} onPress={alreadyContact ? () => router.replace('/(tabs)/contacts') : sendRequest} className={`mt-6 h-14 w-full flex-row items-center justify-center rounded-[18px] active:opacity-80 disabled:opacity-60 ${sent || alreadyContact || requestPending ? 'bg-success/15' : 'bg-accent'}`}>{loading ? <ActivityIndicator color={colors.text} /> : <>{alreadyContact || sent ? <Check size={19} color={colors.success} /> : requestPending ? <Clock3 size={19} color={colors.success} /> : <UserPlus size={19} color={colors.text} />}<Text className={`ml-2 font-semibold ${sent || alreadyContact || requestPending ? 'text-success' : 'text-white'}`}>{alreadyContact ? 'Already in contacts' : requestPending ? 'Request pending' : sent ? 'Request sent' : 'Send friend request'}</Text></>}</Pressable>
                 {sent ? <Pressable onPress={() => router.replace({ pathname: '/(tabs)/contacts', params: { tab: 'requests' } })} className="mt-2 h-12 items-center justify-center rounded-[16px] active:bg-white/[0.05]"><Text className="font-semibold text-secondary">View requests</Text></Pressable> : null}
               </View>
             ) : (

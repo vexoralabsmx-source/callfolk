@@ -19,30 +19,60 @@ export function withTimeout<T>(operation: PromiseLike<T>, timeoutMs = 12_000) {
   ]);
 }
 
+export function readableError(error: unknown, fallback: string) {
+  if (error && typeof error === 'object') {
+    const candidate = error as { message?: string; details?: string; hint?: string };
+    return candidate.message || candidate.details || candidate.hint || fallback;
+  }
+  return error instanceof Error ? error.message : fallback;
+}
+
+function isMissingRpc(error: unknown) {
+  const message = readableError(error, '').toLowerCase();
+  return message.includes('schema cache') || message.includes('could not find the function') || message.includes('does not exist');
+}
+
 export async function sendContactRequest(targetUserId: string) {
-  const { data, error } = await withTimeout(supabase.rpc('send_contact_request', { target_user: targetUserId }));
-  if (error) throw error;
-  return data as string;
+  const rpc = await withTimeout(supabase.rpc('send_contact_request', { target_user: targetUserId }));
+  if (!rpc.error) return rpc.data as string;
+  if (!isMissingRpc(rpc.error)) throw rpc.error;
+
+  const { data: auth } = await withTimeout(supabase.auth.getUser());
+  if (!auth.user) throw new Error('Your session expired. Sign in again.');
+  const existing = await withTimeout(supabase.from('contact_requests').select('id, status').eq('sender_id', auth.user.id).eq('receiver_id', targetUserId).maybeSingle());
+  if (existing.error) throw existing.error;
+  if (existing.data?.status === 'pending') return existing.data.id;
+  if (existing.data) throw new Error('This request was already answered. The database update is required before sending it again.');
+  const inserted = await withTimeout(supabase.from('contact_requests').insert({ sender_id: auth.user.id, receiver_id: targetUserId }).select('id').single());
+  if (inserted.error) throw inserted.error;
+  return inserted.data.id;
 }
 
 export async function respondToContactRequest(requestId: string, accept: boolean) {
-  const { error } = await withTimeout(supabase.rpc('respond_to_contact_request', { request_id: requestId, accept_request: accept }));
-  if (error) throw error;
+  const rpc = await withTimeout(supabase.rpc('respond_to_contact_request', { request_id: requestId, accept_request: accept }));
+  if (!rpc.error) return;
+  if (!isMissingRpc(rpc.error)) throw rpc.error;
+
+  const { data: auth } = await withTimeout(supabase.auth.getUser());
+  if (!auth.user) throw new Error('Your session expired. Sign in again.');
+  const request = await withTimeout(supabase.from('contact_requests').select('sender_id').eq('id', requestId).eq('receiver_id', auth.user.id).single());
+  if (request.error) throw request.error;
+  const updated = await withTimeout(supabase.from('contact_requests').update({ status: accept ? 'accepted' : 'declined', responded_at: new Date().toISOString() }).eq('id', requestId));
+  if (updated.error) throw updated.error;
+  if (accept) {
+    const contact = await withTimeout(supabase.from('contacts').upsert({ owner_id: auth.user.id, contact_id: request.data.sender_id }, { onConflict: 'owner_id,contact_id' }));
+    if (contact.error) throw contact.error;
+  }
 }
 
-export async function startConversation(userId: string, personId: string) {
-  const conversationId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
-    const random = Math.floor(Math.random() * 16);
-    return (character === 'x' ? random : (random & 0x3) | 0x8).toString(16);
-  });
-  const { error } = await withTimeout(supabase.from('conversations').insert({ id: conversationId, created_by: userId }));
-  if (error) throw error;
-  const { error: membersError } = await withTimeout(supabase.from('conversation_members').insert([
-    { conversation_id: conversationId, user_id: userId },
-    { conversation_id: conversationId, user_id: personId },
-  ]));
-  if (membersError) throw membersError;
-  return conversationId;
+export async function startConversation(_userId: string, personId: string) {
+  const { data, error } = await withTimeout(supabase.rpc('create_direct_conversation', { target_user: personId }));
+  if (error) {
+    if (isMissingRpc(error)) throw new Error('Chat setup is not installed in Supabase yet. Apply migration 004_core_workflow_fixes.sql.');
+    throw error;
+  }
+  if (!data) throw new Error('Supabase did not return a conversation.');
+  return data as string;
 }
 
 async function profilesByIds(ids: string[]) {
@@ -85,9 +115,15 @@ export function useContacts(userId?: string) {
     queryKey: ['contacts', userId],
     enabled: Boolean(userId),
     queryFn: async (): Promise<Person[]> => {
-      const { data, error } = await supabase.from('contacts').select('contact_id').eq('owner_id', userId!);
-      if (error) throw error;
-      const map = await profilesByIds((data ?? []).map((row) => row.contact_id));
+      const [contacts, accepted] = await Promise.all([
+        withTimeout(supabase.from('contacts').select('contact_id').eq('owner_id', userId!)),
+        withTimeout(supabase.from('contact_requests').select('sender_id, receiver_id').eq('status', 'accepted').or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)),
+      ]);
+      if (contacts.error) throw contacts.error;
+      if (accepted.error) throw accepted.error;
+      const ids = new Set((contacts.data ?? []).map((row) => row.contact_id));
+      for (const request of accepted.data ?? []) ids.add(request.sender_id === userId ? request.receiver_id : request.sender_id);
+      const map = await profilesByIds([...ids]);
       return [...map.values()];
     },
   });

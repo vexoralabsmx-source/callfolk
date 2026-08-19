@@ -16,6 +16,8 @@ Existing Supabase projects created with the first schema version must also apply
 
 Apply `supabase/migrations/003_contact_request_workflow.sql` to enable friend requests. It adds the protected database functions used to send, accept, and decline requests, and creates mutual contacts only after a request is accepted.
 
+Apply `supabase/migrations/004_core_workflow_fixes.sql` to existing projects. It is an idempotent all-in-one repair for friend requests and direct conversations, including the RLS-safe function required to open a chat.
+
 LiveKit access tokens must be minted by a trusted server or Supabase Edge Function. Never place API secrets in `EXPO_PUBLIC_*` variables.
 
 ## Enable real calls

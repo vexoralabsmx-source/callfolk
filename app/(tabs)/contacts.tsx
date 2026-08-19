@@ -9,7 +9,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { IconButton } from '@/components/IconButton';
 import { Screen } from '@/components/Screen';
 import { SearchField } from '@/components/SearchField';
-import { respondToContactRequest, startConversation, useContactRequests, useContacts, type ContactRequestView } from '@/features/app-data';
+import { readableError, respondToContactRequest, startConversation, useContactRequests, useContacts, type ContactRequestView } from '@/features/app-data';
 import { colors } from '@/lib/theme';
 import { useAuthStore } from '@/stores/auth-store';
 
@@ -39,7 +39,7 @@ export default function ContactsScreen() {
       const conversationId = await startConversation(user.id, personId);
       router.push({ pathname: '/chat/[id]', params: { id: conversationId, personId } });
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Could not start the conversation.');
+      setFeedback(readableError(error, 'Could not start the conversation.'));
     } finally {
       setPendingId(null);
     }
@@ -55,7 +55,7 @@ export default function ContactsScreen() {
         queryClient.invalidateQueries({ queryKey: ['contacts', user?.id] }),
       ]);
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Could not update the request.');
+      setFeedback(readableError(error, 'Could not update the request.'));
     } finally {
       setPendingId(null);
     }

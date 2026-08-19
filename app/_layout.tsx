@@ -52,6 +52,8 @@ export default function RootLayout() {
             <Stack.Screen name="chat/[id]" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="call/[id]" options={{ animation: 'fade', presentation: 'fullScreenModal' }} />
             <Stack.Screen name="contact/add" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
+            <Stack.Screen name="profile/edit" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="settings/[section]" options={{ animation: 'slide_from_right' }} />
           </Stack>
         </QueryClientProvider>
       </SafeAreaProvider>
