@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { ActivityIndicator, Pressable, Text } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { z } from 'zod';
 import { AuthShell } from '@/components/AuthShell';
@@ -26,12 +27,14 @@ function makeContactId(name: string) {
 
 export default function SignUpScreen() {
   const signInDemo = useAuthStore((state) => state.signInDemo);
-  const { control, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm<Values>({
+  const [serverError, setServerError] = useState<string | null>(null);
+  const { control, handleSubmit, formState: { errors, isSubmitting } } = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: { displayName: '', username: '', email: '', password: '' },
   });
 
   const onSubmit = handleSubmit(async (values) => {
+    setServerError(null);
     if (isSupabaseConfigured) {
       const { data, error } = await supabase.auth.signUp({
         email: values.email,
@@ -39,13 +42,22 @@ export default function SignUpScreen() {
         options: { data: { display_name: values.displayName, username: values.username } },
       });
       if (error) {
-        setError('email', { message: error.message });
+        const databaseTriggerFailed = error.message.toLowerCase().includes('database error saving new user');
+        setServerError(databaseTriggerFailed
+          ? 'Supabase could not create your profile. Apply migration 002_fix_profile_signup.sql to repair the database trigger.'
+          : error.message);
         return;
       }
       await signInDemo({ id: data.user?.id, displayName: values.displayName, username: values.username, contactId: makeContactId(values.displayName) });
     } else {
       await signInDemo({ displayName: values.displayName, username: values.username, contactId: makeContactId(values.displayName) });
     }
+    router.replace('/(tabs)/chats');
+  });
+
+  const continueLocally = handleSubmit(async (values) => {
+    setServerError(null);
+    await signInDemo({ displayName: values.displayName, username: values.username, contactId: makeContactId(values.displayName) });
     router.replace('/(tabs)/chats');
   });
 
@@ -63,6 +75,16 @@ export default function SignUpScreen() {
       <Controller control={control} name="password" render={({ field: { onChange, onBlur, value } }) => (
         <FormField label="Password" placeholder="At least 8 characters" value={value} onChangeText={onChange} onBlur={onBlur} error={errors.password?.message} secure />
       )} />
+      {serverError ? (
+        <View className="mt-3 rounded-2xl border border-danger/25 bg-danger/10 p-4">
+          <Text className="text-sm leading-5 text-danger">{serverError}</Text>
+          {__DEV__ ? (
+            <Pressable accessibilityRole="button" onPress={continueLocally} className="mt-3 h-12 items-center justify-center rounded-xl bg-white/[0.08] active:opacity-70">
+              <Text className="font-semibold text-primary">Continue locally for now</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ disabled: isSubmitting }}

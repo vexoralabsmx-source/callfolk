@@ -10,6 +10,13 @@ import { BrandMark } from '@/components/BrandMark';
 export function AuthShell({ title, subtitle, children }: PropsWithChildren<{ title: string; subtitle: string }>) {
   const { width } = useWindowDimensions();
   const desktop = Platform.OS === 'web' && width >= 768;
+  const goBackSafely = () => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/');
+  };
   return (
     <View className="flex-1 bg-ink">
       <AmbientBackground />
@@ -24,7 +31,7 @@ export function AuthShell({ title, subtitle, children }: PropsWithChildren<{ tit
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Go back"
-                  onPress={() => router.back()}
+                  onPress={goBackSafely}
                   className="h-12 w-12 items-center justify-center rounded-2xl border border-white/[0.06] bg-elevated active:opacity-60"
                 >
                   <ArrowLeft size={21} color={colors.text} />

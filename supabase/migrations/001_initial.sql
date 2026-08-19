@@ -5,10 +5,11 @@ create type public.message_kind as enum ('text', 'image', 'voice', 'file', 'syst
 create type public.call_status as enum ('ringing', 'connected', 'ended', 'missed', 'failed');
 
 create or replace function public.make_contact_id(display_name text)
-returns text language sql volatile as $$
+returns text language sql volatile set search_path = public as $$
   select upper(
     rpad(left(regexp_replace(coalesce(display_name, 'USR'), '[^a-zA-Z]', '', 'g'), 3), 3, 'X') || '-' ||
-    encode(gen_random_bytes(3), 'hex') || '-' || encode(gen_random_bytes(2), 'hex')
+    left(md5(random()::text || clock_timestamp()::text), 6) || '-' ||
+    left(md5(clock_timestamp()::text || random()::text), 4)
   );
 $$;
 

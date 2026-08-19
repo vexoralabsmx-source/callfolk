@@ -12,6 +12,8 @@ npm start
 
 Without environment variables, authentication runs in demo mode so the complete UI flow remains testable. Apply `supabase/migrations/001_initial.sql` to a new Supabase project before enabling real auth.
 
+Existing Supabase projects created with the first schema version must also apply `supabase/migrations/002_fix_profile_signup.sql`. It repairs the profile trigger that can otherwise return `Database error saving new user` during registration.
+
 LiveKit access tokens must be minted by a trusted server or Supabase Edge Function. Never place API secrets in `EXPO_PUBLIC_*` variables.
 
 ## Enable real calls
